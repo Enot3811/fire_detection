@@ -1,0 +1,18 @@
+{
+    "random_seed": 42,
+
+    "device": "cpu",
+    "lr": 0.01,
+    "weight_decay": 0.001,
+
+    "dataset": "data/cvat/union_dataset",
+    "num_classes": 3,
+    "batch_size": 2,
+    "shuffle_train": true,
+    "shuffle_val": false,
+    "cls_to_id": {
+        "background": 0,
+        "fire": 1,
+        "smoke": 2
+    }
+}
