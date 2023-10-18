@@ -7,6 +7,7 @@ from torch import FloatTensor, Tensor
 import torchvision
 from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+from torchmetrics import Metric
 
 
 def rcnn_collate_fn(
@@ -68,3 +69,45 @@ def get_rcnn_model(num_classes: int) -> FasterRCNN:
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
     return model
+
+
+class RcnnLosses(Metric):
+    def __init__(self) -> None:
+        super().__init__()
+        self.add_state('loss_classifier',
+                       default=torch.tensor(0, dtype=torch.float64),
+                       dist_reduce_fx='sum')
+        self.add_state('loss_box_reg',
+                       default=torch.tensor(0, dtype=torch.float64),
+                       dist_reduce_fx='sum')
+        self.add_state('loss_objectness',
+                       default=torch.tensor(0, dtype=torch.float64),
+                       dist_reduce_fx='sum')
+        self.add_state('loss_rpn_box_reg',
+                       default=torch.tensor(0, dtype=torch.float64),
+                       dist_reduce_fx='sum')
+        self.add_state('n_total',
+                       default=torch.tensor(0, dtype=torch.float64),
+                       dist_reduce_fx='sum')
+    
+    def update(self, losses_dict: Dict[str, FloatTensor]):
+        self.loss_classifier += losses_dict['loss_classifier']
+        self.loss_box_reg += losses_dict['loss_box_reg']
+        self.loss_objectness += losses_dict['loss_objectness']
+        self.loss_rpn_box_reg += losses_dict['loss_rpn_box_reg']
+        self.n_total += 1
+
+    def compute(self) -> Dict[str, FloatTensor]:
+        self.loss_classifier /= self.n_total
+        self.loss_box_reg /= self.n_total
+        self.loss_objectness /= self.n_total
+        self.loss_rpn_box_reg /= self.n_total
+        total_loss = (self.loss_classifier + self.loss_box_reg +
+                      self.loss_objectness + self.loss_rpn_box_reg)
+        return {
+            'total_loss': total_loss,
+            'loss_classifier': self.loss_classifier,
+            'loss_box_reg': self.loss_box_reg,
+            'loss_objectness': self.loss_objectness,
+            'loss_rpn_box_reg': self.loss_rpn_box_reg
+        }
