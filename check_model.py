@@ -70,15 +70,24 @@ def main(train_config: Path):
     
     # Get the model
     model = get_rcnn_model(config['num_classes'])
+    model.to(device=device)
     
     # Train step
     images, targets, img_names, img_sizes = next(iter(train_dloader))
+    images = list(image.to(device) for image in images)
+    targets = [{k: v.to(device) if isinstance(v, torch.Tensor) else v
+                for k, v in t.items()}
+               for t in targets]
     losses = model(images, targets)
     print(losses)
 
     # Val step
     model.eval()
     images, targets, img_names, img_sizes = next(iter(val_dloader))
+    images = list(image.to(device) for image in images)
+    targets = [{k: v.to(device) if isinstance(v, torch.Tensor) else v
+                for k, v in t.items()}
+               for t in targets]
     predictions = model(images)
     print(predictions)
 
